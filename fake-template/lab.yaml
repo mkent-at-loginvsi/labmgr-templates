@@ -1,0 +1,14 @@
+name: fake-template
+description: A no-op template used for integration tests
+default_ttl_hours: 1
+estimated_hourly_cost: 0.01
+variables:
+  - name: vm_name
+    type: string
+    description: Name for the fake VM
+    default: "test-vm"
+  - name: purpose
+    type: string
+    description: Why this lab exists
+    tag: true
+    default: "testing"

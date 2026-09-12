@@ -1,0 +1,8 @@
+- hosts: all
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: write a marker file proving this playbook ran
+      copy:
+        content: "provisioned {{ inventory_hostname }}\n"
+        dest: "provisioned.txt"
