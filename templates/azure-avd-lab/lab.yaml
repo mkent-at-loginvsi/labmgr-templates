@@ -29,7 +29,7 @@ variables:
   - name: admin_source_cidr
     type: string
     description: CIDR allowed to reach RDP (3389) and WinRM (5985), e.g. your workstation's public IP/32
-  
+
   - name: vm_size_dc
     type: string
     description: VM size for the domain controller
@@ -49,6 +49,16 @@ variables:
     type: string
     description: Entra ID object ID (user or group) to grant the published desktop to; leave blank to assign access manually later
     default: ""
+
+  - name: test_user_count
+    type: integer
+    description: Number of AD test accounts to create (testuser01, testuser02, ...) for load testing; they're added to the SessionDesktop AD group and granted RDP access to the session hosts
+    default: 50
+
+  - name: test_user_password
+    type: string
+    secret: true
+    description: Shared password for every test account (testuser01..N)
 
   - name: purpose
     type: string

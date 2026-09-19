@@ -51,6 +51,18 @@ variable "avd_user_object_id" {
   default     = ""
 }
 
+variable "test_user_count" {
+  type        = number
+  description = "Number of AD test accounts to create; not used by Terraform, only declared so Lab Manager can pass it through to Ansible"
+  default     = 50
+}
+
+variable "test_user_password" {
+  type        = string
+  description = "Shared password for the AD test accounts; not used by Terraform, only declared so Lab Manager can pass it through to Ansible"
+  sensitive   = true
+}
+
 variable "labmgr_tags" {
   type        = map(string)
   description = "Tags applied to every taggable resource; populated by Lab Manager"

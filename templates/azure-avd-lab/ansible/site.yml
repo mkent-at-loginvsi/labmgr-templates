@@ -17,6 +17,30 @@
         safe_mode_password: "{{ ansible_password }}"
         reboot: true
 
+- name: Create AD test accounts for load testing
+  hosts: domain_controllers
+  gather_facts: false
+  tasks:
+    - name: Create the SessionDesktop AD group
+      microsoft.ad.group:
+        name: SessionDesktop
+        scope: global
+        category: security
+        state: present
+
+    - name: Create test user accounts
+      microsoft.ad.user:
+        name: "testuser{{ '%02d' | format(item) }}"
+        upn: "testuser{{ '%02d' | format(item) }}@{{ domain_name }}"
+        password: "{{ test_user_password }}"
+        password_never_expires: true
+        enabled: true
+        state: present
+        groups:
+          add:
+            - SessionDesktop
+      loop: "{{ range(1, test_user_count | int + 1) | list }}"
+
 - name: Join session hosts to the domain
   hosts: session_hosts
   gather_facts: false
@@ -35,6 +59,13 @@
         domain_admin_password: "{{ ansible_password }}"
         state: domain
         reboot: true
+
+    - name: Grant the SessionDesktop group RDP access to the session host
+      ansible.windows.win_group_membership:
+        name: Remote Desktop Users
+        members:
+          - "SessionDesktop@{{ domain_name }}"
+        state: present
 
 - name: Install and register the AVD agent on session hosts
   hosts: session_hosts
