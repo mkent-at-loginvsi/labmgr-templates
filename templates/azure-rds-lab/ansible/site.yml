@@ -80,7 +80,11 @@
         name: RDS-RD-Server
         include_management_tools: true
         state: present
-        restart: true
+      register: rd_server_feature
+
+    - name: Reboot if installing RDS-RD-Server requires it
+      ansible.windows.win_reboot:
+      when: rd_server_feature.reboot_required
 
 - name: Install the RD Connection Broker and RD Web Access roles
   hosts: brokers
@@ -94,7 +98,11 @@
           - RSAT-RDS-Tools
         include_management_tools: true
         state: present
-        restart: true
+      register: rds_broker_feature
+
+    - name: Reboot if installing the broker roles requires it
+      ansible.windows.win_reboot:
+      when: rds_broker_feature.reboot_required
 
 - name: Create the RDS session deployment and collection
   hosts: brokers
