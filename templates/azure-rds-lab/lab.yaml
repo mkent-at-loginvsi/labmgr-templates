@@ -1,0 +1,68 @@
+name: azure-rds-lab
+description: >-
+  On-premises-style RDS lab: a Windows Server domain controller running a new
+  Active Directory forest, a dedicated RD Connection Broker/RD Web Access
+  server, and a session collection of domain-joined Windows Server session
+  hosts. Login is pure Active Directory — no Entra ID/Azure RBAC involved.
+default_ttl_hours: 8
+estimated_hourly_cost: 0.45
+variables:
+  - name: location
+    type: string
+    description: Azure region to deploy into
+    default: "eastus"
+
+  - name: domain_name
+    type: string
+    description: Fully-qualified DNS name for the new Active Directory forest
+    default: "corp.labmgr.local"
+
+  - name: admin_username
+    type: string
+    description: Local admin on every VM; becomes the domain admin once the DC is promoted
+    default: "labadmin"
+
+  - name: admin_password
+    type: string
+    secret: true
+    description: Password for admin_username (also used as the DC's safe-mode/DSRM password)
+
+  - name: admin_source_cidr
+    type: string
+    description: CIDR allowed to reach RDP (3389) and WinRM (5985), e.g. your workstation's public IP/32
+
+  - name: vm_size_dc
+    type: string
+    description: VM size for the domain controller
+    default: "Standard_B2ms"
+
+  - name: vm_size_broker
+    type: string
+    description: VM size for the RD Connection Broker / RD Web Access server
+    default: "Standard_B2ms"
+
+  - name: vm_size_session_host
+    type: string
+    description: VM size for each RDS session host
+    default: "Standard_D2s_v5"
+
+  - name: session_host_count
+    type: integer
+    description: Number of RDS session hosts in the session collection
+    default: 2
+
+  - name: test_user_count
+    type: integer
+    description: Number of AD test accounts to create (testuser01, testuser02, ...) for load testing; they're added to the SessionDesktop AD group and granted RDP access to the session hosts
+    default: 50
+
+  - name: test_user_password
+    type: string
+    secret: true
+    description: Shared password for every test account (testuser01..N)
+
+  - name: purpose
+    type: string
+    description: Why this lab exists (shows up as a resource tag)
+    tag: true
+    default: "rds-lab"

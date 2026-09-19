@@ -1,0 +1,118 @@
+---
+- name: Promote the domain controller
+  hosts: domain_controllers
+  gather_facts: false
+  tasks:
+    - name: Install AD-DS and DNS Windows features
+      ansible.windows.win_feature:
+        name:
+          - AD-Domain-Services
+          - DNS
+        include_management_tools: true
+        state: present
+
+    - name: Create the new forest and domain
+      microsoft.ad.domain:
+        dns_domain_name: "{{ domain_name }}"
+        safe_mode_password: "{{ ansible_password }}"
+        reboot: true
+
+- name: Create AD test accounts for load testing
+  hosts: domain_controllers
+  gather_facts: false
+  tasks:
+    - name: Create the SessionDesktop AD group
+      microsoft.ad.group:
+        name: SessionDesktop
+        scope: global
+        category: security
+        state: present
+
+    - name: Create test user accounts
+      microsoft.ad.user:
+        name: "testuser{{ '%02d' | format(item) }}"
+        upn: "testuser{{ '%02d' | format(item) }}@{{ domain_name }}"
+        password: "{{ test_user_password }}"
+        password_never_expires: true
+        enabled: true
+        state: present
+        groups:
+          add:
+            - SessionDesktop
+      loop: "{{ range(1, test_user_count | int + 1) | list }}"
+
+- name: Join session hosts and the broker to the domain
+  hosts: session_hosts:brokers
+  gather_facts: false
+  tasks:
+    - name: Wait for the domain controller's DNS to be reachable
+      ansible.windows.win_command: "nslookup {{ domain_name }}"
+      register: dns_check
+      retries: 20
+      delay: 15
+      until: dns_check.rc == 0
+
+    - name: Join the domain
+      microsoft.ad.membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: "{{ ansible_user }}@{{ domain_name }}"
+        domain_admin_password: "{{ ansible_password }}"
+        state: domain
+        reboot: true
+
+- name: Grant the SessionDesktop group RDP access on session hosts
+  hosts: session_hosts
+  gather_facts: false
+  tasks:
+    - name: Add SessionDesktop to the local Remote Desktop Users group
+      ansible.windows.win_group_membership:
+        name: Remote Desktop Users
+        members:
+          - "SessionDesktop@{{ domain_name }}"
+        state: present
+
+- name: Install the RD Session Host role
+  hosts: session_hosts
+  gather_facts: false
+  tasks:
+    - name: Install RDS-RD-Server
+      ansible.windows.win_feature:
+        name: RDS-RD-Server
+        include_management_tools: true
+        state: present
+        restart: true
+
+- name: Install the RD Connection Broker and RD Web Access roles
+  hosts: brokers
+  gather_facts: false
+  tasks:
+    - name: Install RDS-Connection-Broker, RDS-Web-Access, RSAT-RDS-Tools
+      ansible.windows.win_feature:
+        name:
+          - RDS-Connection-Broker
+          - RDS-Web-Access
+          - RSAT-RDS-Tools
+        include_management_tools: true
+        state: present
+        restart: true
+
+- name: Create the RDS session deployment and collection
+  hosts: brokers
+  gather_facts: false
+  vars:
+    session_host_fqdns: "{{ groups['session_hosts'] | map('extract', hostvars, 'fqdn') | list }}"
+  tasks:
+    - name: Create the deployment and the SessionDesktop session collection
+      ansible.windows.win_shell: |
+        Import-Module RemoteDesktop
+        $sessionHosts = @(
+        {% for h in session_host_fqdns %}
+          "{{ h }}"{{ "," if not loop.last else "" }}
+        {% endfor %}
+        )
+        if (-not (Get-RDServer -ErrorAction SilentlyContinue)) {
+          New-RDSessionDeployment -ConnectionBroker "{{ fqdn }}" -WebAccessServer "{{ fqdn }}" -SessionHost $sessionHosts
+        }
+        if (-not (Get-RDSessionCollection -CollectionName "SessionDesktop" -ConnectionBroker "{{ fqdn }}" -ErrorAction SilentlyContinue)) {
+          New-RDSessionCollection -CollectionName "SessionDesktop" -SessionHost $sessionHosts -ConnectionBroker "{{ fqdn }}"
+        }
